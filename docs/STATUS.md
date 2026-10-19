@@ -59,7 +59,7 @@ Observed environment: Windows with CPython 3.12.14. The interpreter path is
 machine specific and is deliberately not recorded here.
 
 With `PYTHONPATH=src`, the command `python -m unittest discover -s tests`
-returned **731 tests in 464.277 seconds**: 725 passing and 6 skipped. Every skip
+returned **735 tests in 474.050 seconds**: 729 passing and 6 skipped. Every skip
 says why: five symbolic link cases on a host that does not grant the
 privilege, and one POSIX file permission case that does not apply on Windows.
 The Windows junction cases run.
@@ -68,7 +68,7 @@ The Windows junction cases run.
 `unittest` prints `Ran <total>`, and the skip count is part of that total. A run
 without a database reports the *same* total with 26 skipped, not fewer tests, so
 "the suite passes N tests" was wrong twice over: it counted skipped tests as
-passing and it moved with the environment. Read it as **725 green of 731**, and
+passing and it moved with the environment. Read it as **729 green of 735**, and
 run it with `CSHCLI_REMOTE_DSN` pointing at the local cluster, because twenty
 tests that talk to PostgreSQL otherwise skip and prove nothing.
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "scripts"))
 import migrate
+from tests.postgres_guard import require_database
 
 
 class MigrationFileTests(unittest.TestCase):
@@ -95,30 +96,23 @@ class RepositoryMigrationTests(unittest.TestCase):
 
 
 class ApplyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.dsn = os.environ.get("CSHCLI_TEST_DSN", "").strip()
+        require_database(cls.dsn)
+
     def setUp(self):
-        self.dsn = os.environ.get("CSHCLI_TEST_DSN", "").strip()
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.folder = Path(self.temp.name)
-
-    def require_database(self):
-        if not self.dsn:
-            self.skipTest("no hay CSHCLI_TEST_DSN: levanta el clúster con "
-                          "python scripts/postgres_local.py start")
-        return self.dsn
 
     def write(self, name, content):
         target = self.folder / name
         target.write_text(content, encoding="utf-8", newline="\n")
         return target
 
-    def without_a_server_the_test_says_why_it_skips(self):
-        self.require_database()
-        import psycopg
-        psycopg.connect(self.dsn, connect_timeout=10).close()
-
     def test_a_migration_is_applied_once_and_never_again(self):
-        dsn = self.require_database()
+        dsn = self.dsn
         import psycopg
         name = f"probe_{os.getpid()}_{id(self)}"
         self.write(f"{name}.sql",
@@ -138,7 +132,7 @@ class ApplyTests(unittest.TestCase):
                             (f"{name}.sql",))
 
     def test_a_migration_that_is_not_idempotent_would_break_without_the_ledger(self):
-        dsn = self.require_database()
+        dsn = self.dsn
         import psycopg
         name = f"probe_strict_{os.getpid()}_{id(self)}"
         self.write(f"{name}.sql", f"CREATE TABLE {name} (id integer);")
@@ -157,7 +151,7 @@ class ApplyTests(unittest.TestCase):
                             (f"{name}.sql",))
 
     def test_status_separates_applied_from_pending(self):
-        dsn = self.require_database()
+        dsn = self.dsn
         import psycopg
         name = f"probe_status_{os.getpid()}_{id(self)}"
         self.write(f"{name}.sql", f"CREATE TABLE {name} (id integer);")
@@ -176,7 +170,7 @@ class ApplyTests(unittest.TestCase):
                             (f"{name}.sql",))
 
     def test_the_ledger_is_itself_created_when_missing(self):
-        dsn = self.require_database()
+        dsn = self.dsn
         import psycopg
         with psycopg.connect(dsn, autocommit=True) as con:
             con.execute(f"DROP TABLE IF EXISTS {migrate.LEDGER}")

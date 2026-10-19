@@ -26,6 +26,17 @@ once it leaves alpha.
   been applied and a migration already recorded is skipped.
 
 ### Fixed
+- **A missing database cost six timeouts and said the wrong thing.** Every test
+  that needs PostgreSQL discovered the absence of a server on its own, and each
+  one paid the connection timeout. Nineteen of those turned "there is no
+  database here" into a suite that took 192 seconds instead of 39, and what was
+  left said `ConnectionTimeout`, which reads like a broken product rather than a
+  missing server. The check now happens once per class, through a shared
+  `tests/postgres_guard.py`, and the four modules that each carried their own
+  copy of the same wording use it. The cost is now proportional to the number
+  of classes and not to the number of tests, and it is zero when the server is
+  there. Measured: 192 s before, 32 s after, with the suite unaffected at 39 s
+  when the database answers.
 - **`cshcli update --apply` installed the wrong thing, or nothing at all.** It
   fetched the archive of `main` and compared it against `sorted(digests)[0]` —
   whatever sorted first in the published checksum file, not the file it had
