@@ -2,6 +2,7 @@ import io
 import json
 import os
 import tempfile
+import sys
 import threading
 import unittest
 from pathlib import Path
@@ -12,6 +13,7 @@ from cshcli.cli import main
 from cshcli.client import Client
 from cshcli.errors import DomainError
 from cshcli.local import EmbeddedCoordinator, connect
+import cshcli.onboarding as onboarding
 from cshcli.onboarding import Keyring, project_context, run_loop, run_wizard
 from cshcli.server import make_server
 from cshcli.session import Session
@@ -146,6 +148,67 @@ class WizardTests(unittest.TestCase):
         with self.assertRaises(DomainError) as caught:
             self.run_with([], [])
         self.assertEqual(caught.exception.code, "input_required")
+
+    def test_a_secret_without_a_terminal_is_refused_instead_of_waiting_forever(self):
+        class NotATerminal:
+            def isatty(self):
+                return False
+
+            def readline(self):
+                return ""
+
+        original = sys.stdin
+        sys.stdin = NotATerminal()
+        try:
+            with self.assertRaises(DomainError) as caught:
+                run_wizard(self.client, self.session, self.keyring,
+                           reader=Script(["1", "ana", "", "openai"]),
+                           out=self.output.write)
+        finally:
+            sys.stdin = original
+        self.assertEqual(caught.exception.code, "input_required")
+        self.assertIn("cshcli key set", str(caught.exception),
+                      "el motivo debe decir como guardar la clave sin terminal")
+
+    def test_a_piped_secret_is_read_from_the_same_stream_as_the_answers(self):
+        class Piped:
+            def __init__(self, line):
+                self.line = line
+
+            def isatty(self):
+                return False
+
+            def readline(self):
+                line, self.line = self.line, ""
+                return line
+
+        original = sys.stdin
+        sys.stdin = Piped("sk-de-la-tuberia\n")
+        try:
+            run_wizard(self.client, self.session, self.keyring,
+                       reader=Script(["1", "ana", "", "openai"]),
+                       out=self.output.write)
+        finally:
+            sys.stdin = original
+        self.assertEqual(self.keyring.get("openai"), "sk-de-la-tuberia")
+
+    def test_a_terminal_reads_the_secret_without_echo(self):
+        class ATerminal:
+            def isatty(self):
+                return True
+
+            def readline(self):
+                return "no-debe-usar-esto\n"
+
+        original = sys.stdin
+        sys.stdin = ATerminal()
+        try:
+            with mock.patch("getpass.getpass", return_value="sk-oculta") as reader:
+                value = onboarding._read_secret("  Clave: ")
+        finally:
+            sys.stdin = original
+        self.assertEqual(value, "sk-oculta")
+        reader.assert_called_once()
 
     def test_an_empty_key_is_asked_again(self):
         self.run_with(["1", "ana", "", "openai"], ["", "sk-real"])
@@ -432,10 +495,19 @@ class CliStartTests(unittest.TestCase):
     def run_main(self, argv, answers, secrets):
         reader, hidden = iter(answers), iter(secrets)
         printed = []
+
+        class ATerminal:
+            def isatty(self):
+                return True
+
+            def readline(self):
+                return ""
+
         with mock.patch("builtins.input", lambda prompt="": (
                 printed.append(prompt), next(reader))[1]), \
              mock.patch("getpass.getpass", lambda prompt="", stream=None: (
                 printed.append(prompt), next(hidden))[1]), \
+             mock.patch("sys.stdin", ATerminal()), \
              mock.patch("sys.stdout", self.output):
             code = main(argv)
         return code, "".join(printed)

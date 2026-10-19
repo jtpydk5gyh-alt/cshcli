@@ -26,6 +26,13 @@ once it leaves alpha.
   been applied and a migration already recorded is skipped.
 
 ### Fixed
+- **`cshcli start` could wait forever for a key that could not be typed.** The
+  wizard asked for the provider key through `getpass`, which reads the console
+  rather than the piped input, so a wizard driven by anything other than a
+  terminal blocked indefinitely instead of saying what was wrong. The key is
+  now read from the terminal when there is one, and from the same stream as the
+  other answers when there is not, and a wizard that runs out of input says so
+  and points at `cshcli key set`.
 - **A wheel without the public key would have installed perfectly and then
   refused every update in silence.** The release checked that the installed copy
   imports and answers `--help`, but not that it can find the trust anchor. The

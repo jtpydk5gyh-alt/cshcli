@@ -360,7 +360,7 @@ python -m compileall -q src tests scripts
 python scripts/cshcli.py --help
 ```
 
-The full suite runs 743 tests with a live PostgreSQL, 737 passing and 6
+The full suite runs 750 tests with a live PostgreSQL, 744 passing and 6
 explicitly skipped: symbolic-link
 cases this host does not grant, one POSIX file-permission case that does not
 apply on Windows, and twenty that need `CSHCLI_REMOTE_DSN`. Those twenty were

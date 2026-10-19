@@ -277,10 +277,24 @@ def run_loop(provider, model, ask, reader=None, out=None, keep=20, context=None,
             del history[:-keep]
 
 
+def _read_secret(prompt: str) -> str:
+    if sys.stdin is not None and sys.stdin.isatty():
+        return getpass.getpass(prompt, stream=sys.stderr)
+    sys.stderr.write(prompt)
+    sys.stderr.flush()
+    line = sys.stdin.readline() if sys.stdin is not None else ""
+    if not line:
+        raise DomainError(400, "input_required",
+                          "cshcli start necesita una terminal interactiva; "
+                          "puedes guardar la clave antes con "
+                          "'cshcli key set <proveedor>'.")
+    return line.strip()
+
+
 def run_wizard(client, session, keyring, reader=None, secret=None, out=None):
     reader = reader or input
     out = out or print
-    secret = secret or (lambda prompt: getpass.getpass(prompt, stream=sys.stderr))
+    secret = secret or _read_secret
     if session.ready():
         out(f"\n  Ya estás listo: {session.name} en '{session.project_name}'.")
         out("  Escribe 'cshcli' para hablar con tu agente.\n")
