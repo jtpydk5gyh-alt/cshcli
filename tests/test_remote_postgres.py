@@ -6,6 +6,7 @@ import uuid
 
 from cshcli.errors import DomainError
 from cshcli.remote.database import RemoteStore, driver_available
+from tests.postgres_guard import require_database
 
 
 DSN = os.environ.get("CSHCLI_REMOTE_DSN", "")
@@ -65,14 +66,13 @@ SKIP_REASON = (
 
 
 class RemotePostgresTests(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         if not (DSN and driver_available()):
-            self.skipTest(SKIP_REASON)
-        import psycopg
-        try:
-            psycopg.connect(DSN, connect_timeout=10).close()
-        except Exception as error:
-            self.skipTest(f"{SKIP_REASON} ({type(error).__name__})")
+            raise unittest.SkipTest(SKIP_REASON)
+        require_database(DSN)
+
+    def setUp(self):
         self.project_id = f"race-{uuid.uuid4().hex[:12]}"
         self.user_id = _seed(DSN, self.project_id)
 

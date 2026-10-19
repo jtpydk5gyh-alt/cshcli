@@ -10,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 from cshcli.remote_server import make_remote_server
+from tests.postgres_guard import require_database
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "scripts"))
 import tls_certificate
@@ -71,9 +72,13 @@ class CertificateTests(unittest.TestCase):
 
 
 class RemoteServerTests(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         if not DSN:
-            self.skipTest(SKIP_REASON)
+            raise unittest.SkipTest(SKIP_REASON)
+        require_database(DSN)
+
+    def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.report = tls_certificate.write_self_signed(

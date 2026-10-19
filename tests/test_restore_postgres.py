@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1] / "scripts"))
 import postgres_local
 from postgres_local import Cluster
+from tests.postgres_guard import require_database
 
 DSN = os.environ.get("CSHCLI_REMOTE_DSN", "")
 
@@ -18,14 +19,13 @@ SKIP_REASON = (
 
 
 class RestoreDrillTests(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         if not DSN:
-            self.skipTest(SKIP_REASON)
-        try:
-            import psycopg
-            psycopg.connect(DSN, connect_timeout=10).close()
-        except Exception as error:
-            self.skipTest(f"{SKIP_REASON} ({type(error).__name__})")
+            raise unittest.SkipTest(SKIP_REASON)
+        require_database(DSN)
+
+    def setUp(self):
         self.temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(self.temp.cleanup)
         self.archive = Path(self.temp.name) / "copia.dump"
