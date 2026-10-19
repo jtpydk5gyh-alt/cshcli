@@ -34,6 +34,15 @@ once it leaves alpha.
   release with no explanation. `release.py` now refuses the release when the
   installed copy has no public key, and the check is proved in both directions:
   a copy with the key is accepted and one without it is refused.
+- **The plan's final verification matrix was not tied to anything.** It listed
+  fourteen requirements as the contract of the whole project, and no test
+  checked that the proofs still existed. Renaming or deleting a proof test
+  would have left the matrix quietly claiming something nobody verified.
+  `tests/test_verification_matrix.py` now names the test that proves each row
+  and fails when one of them disappears, so the matrix can only change on
+  purpose. Checked in both directions: renaming a proof test makes it fail.
+  The two rows that cannot be proven on one machine, two machines and the
+  integration run, say so instead of pretending.
 - **The update report still said the install would come from `main`.** After the
   install path moved to the signed release, that sentence became false, and a
   report that lies about where an install comes from is worse than no report.

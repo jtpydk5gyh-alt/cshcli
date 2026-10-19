@@ -31,7 +31,7 @@ actual.
   cero docstrings y un único comentario, el shebang de
   `scripts/push_rewritten_main.py`.
 - La última suite completa, **con PostgreSQL 16.2 en pie**, terminó con
-  **738 pruebas: 732 verdes y 6 omitidas con motivo, en 495.663 s**. Las seis
+  **743 pruebas: 737 verdes y 6 omitidas con motivo, en 501.390 s**. Las seis
   omitidas son cinco casos de symlink que esta máquina no concede y uno de
   permisos POSIX que no aplica en Windows. Sin base de datos se omiten veinte
   más, y por eso esta cuenta importa: **el total no baja por tener la base
@@ -432,7 +432,7 @@ hechos; **el paso 4, `serve --remote`, necesita una máquina**.
 | Módulo Python | `cshcli`, 24 módulos más `__init__` y `__main__`, comando `cshcli`, script `scripts/cshcli.py` |
 | Estado local | `.cshcli/`, ignorado por git |
 | PRs mergeadas | 80, sin `--admin`: el control obligatorio se respeta |
-| Pruebas | 738 en total: **732 verdes** y 6 omitidas con motivo, con PostgreSQL 16.2 en pie |
+| Pruebas | 743 en total: **737 verdes** y 6 omitidas con motivo, con PostgreSQL 16.2 en pie |
 | CI | verde en Windows y Linux × Python 3.11, 3.12, 3.13 |
 
 ## Qué es y qué no es
