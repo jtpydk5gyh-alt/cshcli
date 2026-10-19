@@ -20,7 +20,7 @@ says so and the reason is in [OPERATIONS.md](OPERATIONS.md),
 | What the chat can read | The index lists what fits the budget, README, `docs/`, `src/` and `tests/` first, and skips `.git`, `__pycache__`, `node_modules`, `dist` and the usual binary suffixes. `/ver` refuses absolute paths, `..`, Git metadata, symbolic links, Windows junctions and hard links, and refuses a file that is not text. **The chat reads; it executes nothing** |
 | Finding things | `/buscar <texto>` returns `ruta:línea: texto`, ignores case, visits exactly the files the index lists, caps the answer and reports the hits it left out. A query with no hits prints that and **does not call the provider**, because the answer is already known locally. Symbolic links and junctions are never opened and binaries are skipped |
 | Update check | `cshcli update` compares and reports without changing anything, and says where an install would come from. `--apply` needs the version typed, then fetches the release's `SHA256SUMS` and `SHA256SUMS.minisig`, **verifies the signature against the key inside the installed package**, picks this interpreter's wheel out of the signed file, checks its checksum and installs it. **Nothing is ever installed from an unreleased branch.** Proved end to end against a real HTTP server serving real artefacts; **never against a published release** |
-| First run without instructions | `cshcli start` is a two-option menu that performs the setup: a private session, or joining with an invitation code or creating a shared project. No server is started first: the coordinator is implicit. `cshcli key set` stores a provider key outside the environment. Tested end to end through the real CLI entry point |
+| First run without instructions | `cshcli start` is a two-option menu that performs the setup: a private session, or joining with an invitation code or creating a shared project. No server is started first: the coordinator is implicit. `cshcli key set` stores a provider key outside the environment. Tested end to end through the real CLI entry point, and **proved from a real installation**: the wheel is built, installed somewhere else, and the whole first run is driven all the way to the chat |
 | Coordinator lifetime | A command with no reachable coordinator runs one inside its own process on an ephemeral port and closes it on exit. Identity, current project and token live in `.cshcli/session.json`, so later commands need no `--url` and no token. Two embedded coordinators over one database are tested. `cshcli serve` still provides a long-lived one |
 | Key storage | `Keyring` in `.cshcli/keys.json`, readable only by the user on POSIX. A key set in the environment wins over one on disk, because whoever exported it knows what they are doing. Nothing ever prints a key |
 | Published artefact | Wheel builds, `SHA256SUMS` written, the **installed** copy imports and answers `--help` on Python 3.12.10, Windows, and `SHA256SUMS` is **signed** with the key at `src/cshcli/release.pub`. **Not published, not checked on other platforms** |
@@ -59,7 +59,7 @@ Observed environment: Windows with CPython 3.12.14. The interpreter path is
 machine specific and is deliberately not recorded here.
 
 With `PYTHONPATH=src`, the command `python -m unittest discover -s tests`
-returned **743 tests in 501.390 seconds**: 737 passing and 6 skipped. Every skip
+returned **750 tests in 564.926 seconds**: 744 passing and 6 skipped. Every skip
 says why: five symbolic link cases on a host that does not grant the
 privilege, and one POSIX file permission case that does not apply on Windows.
 The Windows junction cases run.
@@ -68,7 +68,7 @@ The Windows junction cases run.
 `unittest` prints `Ran <total>`, and the skip count is part of that total. A run
 without a database reports the *same* total with 26 skipped, not fewer tests, so
 "the suite passes N tests" was wrong twice over: it counted skipped tests as
-passing and it moved with the environment. Read it as **737 green of 743**, and
+passing and it moved with the environment. Read it as **744 green of 750**, and
 run it with `CSHCLI_REMOTE_DSN` pointing at the local cluster, because twenty
 tests that talk to PostgreSQL otherwise skip and prove nothing.
 
@@ -198,7 +198,7 @@ Two decisions about what the chat carries, each with a reason:
 
 | Item | Possible here? |
 | --- | --- |
-| First run that needs no instructions, with a local key store | Done. `cshcli start` is a two-option menu that performs the setup, and the coordinator is implicit, so no server is started |
+| First run that needs no instructions, with a local key store | Done, and proved from a real installation. `cshcli start` is a two-option menu that performs the setup, and the coordinator is implicit, so no server is started. The wizard used to wait forever for a key that could not be typed when the input was not a terminal |
 | Document the install command with its three caveats | Done |
 | `cshcli update` that reports first and installs on consent with a checksum | **Done, and the install path was broken.** It fetched the archive of `main` and compared it against whatever sorted first in the checksum file. It now installs the signed release wheel, and the whole path is proved against a real HTTP server. Never exercised against a published release |
 | `cshcli serve --remote` over HTTPS with PostgreSQL | **Done here.** It binds, serves `/healthz` over TLS against a live PostgreSQL and refuses plain HTTP. The certificate is self-signed, so this proves the path, not public trust |
