@@ -26,6 +26,14 @@ once it leaves alpha.
   been applied and a migration already recorded is skipped.
 
 ### Fixed
+- **A wheel without the public key would have installed perfectly and then
+  refused every update in silence.** The release checked that the installed copy
+  imports and answers `--help`, but not that it can find the trust anchor. The
+  updater refuses to install anything it cannot verify, so a wheel that shipped
+  without `release.pub` would have looked healthy and then rejected every
+  release with no explanation. `release.py` now refuses the release when the
+  installed copy has no public key, and the check is proved in both directions:
+  a copy with the key is accepted and one without it is refused.
 - **A missing database cost six timeouts and said the wrong thing.** Every test
   that needs PostgreSQL discovered the absence of a server on its own, and each
   one paid the connection timeout. Nineteen of those turned "there is no

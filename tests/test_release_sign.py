@@ -111,5 +111,64 @@ class PublishedKeyTests(unittest.TestCase):
                          "la clave privada y su contrasena no pueden estar trackeadas")
 
 
+class InstalledCopyTests(unittest.TestCase):
+    """The installed copy is the one that will verify the next release.
+
+    A wheel without the public key installs perfectly, answers --help, and then
+    refuses every update in silence. The release has to notice that before the
+    artefact is published.
+    """
+
+    def build(self, into, without_key=False):
+        wheel = sorted((Path(__file__).resolve().parents[1] / "dist").glob("*.whl"))
+        if not wheel:
+            self.skipTest("no hay wheel en dist/: ejecuta python scripts/release.py")
+        source = Path(__file__).resolve().parents[1]
+        staging = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, staging, True)
+        shutil.copytree(source / "src" / "cshcli", staging / "cshcli",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        version = release.current_version() if hasattr(release, "current_version") else None
+        if version is None:
+            import cshcli
+            version = cshcli.__version__
+        if without_key:
+            (staging / "cshcli" / "release.pub").unlink()
+        project = staging / "pyproject.toml"
+        project.write_text(
+            "[build-system]\nrequires = ['setuptools>=68']\n"
+            "build-backend = 'setuptools.build_meta'\n\n"
+            "[project]\nname = 'cshcli-probe'\nversion = '0.0.0'\n\n"
+            "[tool.setuptools.packages.find]\nwhere = ['.']\n"
+            "[tool.setuptools.package-data]\ncshcli = ['release.pub']\n",
+            encoding="utf-8")
+        built = subprocess.run(
+            [sys.executable, "-m", "pip", "wheel", "--no-deps", "-w", str(staging),
+             str(staging)], capture_output=True, text=True)
+        if built.returncode != 0:
+            self.skipTest(f"no se pudo construir el wheel de prueba: {built.stderr[-200:]}")
+        made = sorted(staging.glob("cshcli_probe-*.whl"))
+        if not made:
+            self.skipTest("no se construyo el wheel de prueba")
+        return made[0], into, version
+
+    def test_an_installed_copy_without_the_key_is_refused(self):
+        if not shutil.which("pip"):
+            self.skipTest("no hay pip")
+        wheel, into, version = self.build(Path(tempfile.mkdtemp()), without_key=True)
+        self.addCleanup(shutil.rmtree, into, True)
+        with self.assertRaises(release.ReleaseRefused) as caught:
+            release.verify_install(wheel, version, into)
+        self.assertIn("public key", str(caught.exception))
+
+    def test_an_installed_copy_with_the_key_is_accepted(self):
+        if not shutil.which("pip"):
+            self.skipTest("no hay pip")
+        wheel, into, version = self.build(Path(tempfile.mkdtemp()))
+        self.addCleanup(shutil.rmtree, into, True)
+        report = release.verify_install(wheel, version, into)
+        self.assertTrue(report["public_key"])
+
+
 if __name__ == "__main__":
     sys.exit(unittest.main())
