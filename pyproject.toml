@@ -32,3 +32,9 @@ remote = ["psycopg[binary]>=3.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# The public key travels inside the wheel: the updater has to know which key
+# signed a release before it installs anything, and a key that only lives in
+# the repository cannot verify a package that is already installed.
+[tool.setuptools.package-data]
+cshcli = ["release.pub"]

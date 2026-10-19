@@ -5,10 +5,12 @@ import tempfile
 import unittest
 import urllib.error
 from pathlib import Path
+from unittest import mock
 
 from cshcli.updater import (ARCHIVE_ROOT, UpdateUnavailable, compare,
                              fetch_checksums, install, newest_remote_version,
-                             parse_version, verify)
+                             parse_version, select_wheel, verify,
+                             verify_signature)
 
 
 class FakeResponse(io.BytesIO):
@@ -85,7 +87,15 @@ class CompareTests(unittest.TestCase):
             with self.subTest(published=published):
                 report = compare("0.2.0", published)
                 self.assertNotIn(report["action"], ("installing", "installing_anything"))
-                self.assertEqual(report["from_main"], True)
+
+    def test_without_a_release_the_install_would_come_from_main(self):
+        self.assertTrue(compare("0.2.0", None)["from_main"])
+
+    def test_with_a_release_the_install_comes_from_that_release(self):
+        for published in ("v0.2.0", "v0.3.0", "garbage"):
+            with self.subTest(published=published):
+                self.assertFalse(compare("0.2.0", published)["from_main"],
+                                 "instalar desde la release, no desde la cabeza de main")
 
 
 class ChecksumTests(unittest.TestCase):
@@ -135,6 +145,55 @@ class ChecksumTests(unittest.TestCase):
         target.write_bytes(b"contents")
         with self.assertRaises(UpdateUnavailable):
             install(target, "")
+
+
+class SignatureGateTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.target = self.root / "SHA256SUMS"
+        self.target.write_text("a" * 64 + "  cshcli-0.2.0.whl\n", encoding="utf-8")
+        self.signature = self.root / "SHA256SUMS.minisig"
+        self.public = self.root / "release.pub"
+
+    def test_without_a_signer_the_signature_cannot_be_verified(self):
+        with mock.patch("cshcli.updater.find_signer", return_value=None):
+            verdict = verify_signature(self.target, self.signature, self.public)
+        self.assertFalse(verdict["valid"])
+        self.assertIn("minisign", verdict["detail"])
+
+    def test_without_the_public_key_the_signature_cannot_be_verified(self):
+        verdict = verify_signature(self.target, self.signature,
+                                   self.root / "no-existe.pub", signer="minisign")
+        self.assertFalse(verdict["valid"])
+        self.assertIn("public key", verdict["detail"])
+
+    def test_without_a_signature_file_the_release_cannot_be_trusted(self):
+        self.public.write_text("untrusted comment: minisign public key 5BECC463E66EA9A4\n"
+                               "RWSkqW7mY8TsWwxeoiTSEHYJrTWUbthX8y1Kbnf8fZPW3smL3zue+nXl\n",
+                               encoding="utf-8")
+        verdict = verify_signature(self.target, self.root / "no-existe.minisig",
+                                   self.public, signer="minisign")
+        self.assertFalse(verdict["valid"])
+        self.assertIn("no signature", verdict["detail"])
+
+
+class WheelSelectionTests(unittest.TestCase):
+    def test_the_wheel_for_this_interpreter_is_preferred(self):
+        digests = {"cshcli-1.0.0-cp312-cp312-win_amd64.whl": "a" * 64,
+                   "cshcli-1.0.0-py3-none-any.whl": "b" * 64}
+        chosen = select_wheel(digests)
+        self.assertTrue(chosen.endswith(".whl"))
+
+    def test_a_universal_wheel_is_chosen_when_there_is_no_built_one(self):
+        digests = {"cshcli-1.0.0.tar.gz": "a" * 64,
+                   "cshcli-1.0.0-py3-none-any.whl": "b" * 64}
+        self.assertEqual(select_wheel(digests), "cshcli-1.0.0-py3-none-any.whl")
+
+    def test_a_release_without_a_wheel_is_refused(self):
+        with self.assertRaises(UpdateUnavailable):
+            select_wheel({"cshcli-1.0.0.tar.gz": "a" * 64})
 
 
 if __name__ == "__main__":

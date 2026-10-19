@@ -260,13 +260,8 @@ def _update(args):
         print("No coincide; no se instala nada.", file=sys.stderr)
         return 1
     try:
-        digests = updater.fetch_checksums(report["archive"].replace("main.zip", "SHA256SUMS"))
-        if not digests:
-            raise updater.UpdateUnavailable("No hay checksums publicados para comparar")
-        name = sorted(digests)[0]
-        target = Path(os.environ.get("CSHCLI_HOME", ".cshcli")) / "update" / name
-        updater.download(report["archive"], target)
-        emit(updater.install(target, digests[name]))
+        target = Path(os.environ.get("CSHCLI_HOME", ".cshcli")) / "update"
+        emit(updater.apply_release(published, target))
     except updater.UpdateUnavailable as reason:
         print(f"\nNo se instaló: {reason}", file=sys.stderr)
         return 1

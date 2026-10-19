@@ -90,11 +90,12 @@ class RealSigningTests(unittest.TestCase):
 class PublishedKeyTests(unittest.TestCase):
     KEY_ID = "5BECC463E66EA9A4"
 
-    def test_the_public_key_that_verifies_the_release_is_in_the_repository(self):
-        published = Path(__file__).resolve().parents[1] / "cshcli-release.pub"
+    def test_the_public_key_that_verifies_the_release_is_in_the_package(self):
+        published = Path(__file__).resolve().parents[1] / "src" / "cshcli" / "release.pub"
         self.assertTrue(published.is_file(),
-                        "sin la clave publica publicada, la firma no significa nada "
-                        "para quien descarga")
+                        "sin la clave publica dentro del paquete, la firma no "
+                        "significa nada para quien instala, y el actualizador no "
+                        "puede verificar nada")
         lines = published.read_text(encoding="utf-8").strip().splitlines()
         self.assertEqual(len(lines), 2, "una clave publica de minisign son dos lineas")
         self.assertIn(self.KEY_ID, lines[0])

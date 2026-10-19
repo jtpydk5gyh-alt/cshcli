@@ -37,8 +37,8 @@ Publishing is a manual step and stays manual while there is one owner.
 **The signing key exists.** The owner authorised its creation on 17 October 2026,
 and `release.py` now signs by itself.
 
-The public key is committed at `cshcli-release.pub` and is the only part of the
-pair that ever leaves the owner's machine:
+The public key lives inside the package, at `src/cshcli/release.pub`, and it is
+the only part of the pair that ever leaves the owner's machine:
 
 ```
 untrusted comment: minisign public key 5BECC463E66EA9A4
@@ -48,7 +48,7 @@ RWSkqW7mY8TsWwxeoiTSEHYJrTWUbthX8y1Kbnf8fZPW3smL3zue+nXl
 Anyone can verify a download with that file alone:
 
 ```
-minisign -Vm dist/SHA256SUMS -p cshcli-release.pub
+minisign -Vm dist/SHA256SUMS -p src/cshcli/release.pub
 ```
 
 Verified on this machine, in both directions, which is the point of doing it at
@@ -78,6 +78,49 @@ every artefact it lists, so adding a file later does not need a new key.
 The older key id `RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3`,
 formerly published in the README, **is not this project's key** and must not be
 used to verify anything here.
+
+## The updater checks the signature, and that changes what it installs
+
+`cshcli update --apply` used to fetch the archive of `main` and compare it
+against the first entry of the published checksum file. Two things were wrong
+with that, and both mattered.
+
+**It installed the wrong thing.** The checksum file lists every artefact of the
+release, and the code took `sorted(digests)[0]` — whatever sorted first, not the
+file it had downloaded. The digest it compared against belonged to a different
+artefact, so the install was refused by its own checksum, and the URL it asked
+for was an archive path that does not serve a single file.
+
+**It trusted the wrong thing.** The checksum and the artefact came from the
+same place. That proves the download was not corrupted in transit, and it
+proves nothing about **who** published it. A checksum cannot distinguish the
+project from anyone who can write to the place the release lives in. Only a
+signature can, and the signature existed but nothing consumed it.
+
+Now the updater takes the release's own assets, in this order, and stops at the
+first one that fails:
+
+1. `SHA256SUMS` from the release.
+2. `SHA256SUMS.minisig` from the release. If it is not there, nothing is
+   installed.
+3. The signature is verified against the key **inside the installed package**,
+   which did not come from the same download.
+4. The wheel for this interpreter is chosen out of the signed checksum file,
+   and only that file is downloaded.
+5. Its checksum is checked against the signed file, and then it is installed.
+
+**What the trust chain is, precisely.** The key in the wheel is the anchor for
+every *subsequent* update, provided the copy of cshcli already installed is
+itself trusted. For the **first** install there is no such anchor, and the key
+has to be obtained out of band: from this repository, from the release page, or
+from someone who already has it. That is a property of every project that signs
+its releases, and it is why the key is published in the repository and not only
+inside the package.
+
+The whole path is proved end to end against a real HTTP server serving real
+artefacts in `tests/test_update_end_to_end.py`: a signed release installs, and
+a missing signature, an altered checksum file, a wheel that does not match, a
+signature from another key and a machine with no `minisign` all install nothing.
 
 ## `release.py` now signs by itself
 
