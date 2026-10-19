@@ -72,12 +72,17 @@ class CompareTests(unittest.TestCase):
     def test_a_newer_install_is_ahead_and_says_why(self):
         report = compare("0.3.0", "v0.2.0")
         self.assertEqual(report["action"], "ahead")
-        self.assertIn("main", report["detail"])
+        self.assertIn("release", report["detail"])
+        self.assertNotIn("main", report["detail"],
+                         "nada se instala desde la cabeza de main")
 
-    def test_no_release_means_unknown_and_warns_about_main(self):
+    def test_no_release_means_unknown_and_installs_nothing(self):
         report = compare("0.2.0", None)
         self.assertEqual(report["action"], "unknown")
-        self.assertIn("main", report["detail"])
+        self.assertIsNone(report["source"])
+        self.assertIn("signed", report["detail"])
+        self.assertNotIn("main", report["detail"],
+                         "nada se instala desde una rama sin publicar")
 
     def test_an_unreadable_remote_version_is_unknown_not_current(self):
         self.assertEqual(compare("0.2.0", "nightly")["action"], "unknown")
@@ -88,14 +93,20 @@ class CompareTests(unittest.TestCase):
                 report = compare("0.2.0", published)
                 self.assertNotIn(report["action"], ("installing", "installing_anything"))
 
-    def test_without_a_release_the_install_would_come_from_main(self):
-        self.assertTrue(compare("0.2.0", None)["from_main"])
+    def test_without_a_release_there_is_no_source_to_install_from(self):
+        self.assertIsNone(compare("0.2.0", None)["source"])
 
     def test_with_a_release_the_install_comes_from_that_release(self):
-        for published in ("v0.2.0", "v0.3.0", "garbage"):
+        for published in ("v0.2.0", "v0.3.0"):
             with self.subTest(published=published):
-                self.assertFalse(compare("0.2.0", published)["from_main"],
-                                 "instalar desde la release, no desde la cabeza de main")
+                source = compare("0.2.0", published)["source"]
+                self.assertIn(published, source)
+                self.assertIn("releases/download", source)
+
+    def test_a_tag_that_is_not_a_version_offers_no_source(self):
+        report = compare("0.2.0", "garbage")
+        self.assertEqual(report["action"], "unknown")
+        self.assertIsNone(report["source"])
 
 
 class ChecksumTests(unittest.TestCase):

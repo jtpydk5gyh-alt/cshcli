@@ -34,6 +34,12 @@ once it leaves alpha.
   release with no explanation. `release.py` now refuses the release when the
   installed copy has no public key, and the check is proved in both directions:
   a copy with the key is accepted and one without it is refused.
+- **The update report still said the install would come from `main`.** After the
+  install path moved to the signed release, that sentence became false, and a
+  report that lies about where an install comes from is worse than no report.
+  The field `from_main` is replaced by `source`, which is the release the install
+  would come from and is `null` when there is no release, because in that case
+  nothing is installed at all.
 - **A missing database cost six timeouts and said the wrong thing.** Every test
   that needs PostgreSQL discovered the absence of a server on its own, and each
   one paid the connection timeout. Nineteen of those turned "there is no
