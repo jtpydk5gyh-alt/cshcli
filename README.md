@@ -339,7 +339,7 @@ python scripts/cshcli.py --help
 python scripts/guard_secrets.py --all
 ```
 
-The full suite runs 712 tests with a live PostgreSQL, 706 passing and 6
+The full suite runs 731 tests with a live PostgreSQL, 725 passing and 6
 explicitly skipped: symbolic-link
 cases this host does not grant, one POSIX file-permission case that does not
 apply on Windows, and twenty that need `CSHCLI_REMOTE_DSN`. Those twenty were
@@ -372,8 +372,10 @@ means and for the limits CI does not yet cover.
    on a private network. **Not available yet and not claimed to be.**
 2. A real PostgreSQL concurrency and restore drill, plus deployment against a
    real provider from more than one machine.
-3. A signed, published release whose wheel and `SHA256SUMS` URLs are exercised
-   end to end by `cshcli update --apply`.
+3. A **published** release whose wheel and `SHA256SUMS` URLs are exercised end to
+   end by `cshcli update --apply` from a public server rather than a local one. The
+   signature is already checked; what is missing is the release being somewhere
+   public.
 4. Windows protection for `.cshcli/keys.json` beyond ordinary file placement.
 
 The [online plan](docs/PLAN-ONLINE.md) has the reasoning and the order. The

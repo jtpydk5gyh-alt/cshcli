@@ -87,42 +87,32 @@ class CliUpdateTests(unittest.TestCase):
         digest = hashlib.sha256(payload).hexdigest()
         expected = Path(self.home) / "update" / NEW_WHEEL
         with mock.patch.object(updater, "newest_remote_version", return_value=self.newer()):
-            with mock.patch.object(updater, "fetch_checksums",
-                                   return_value={NEW_WHEEL: digest}):
-                with mock.patch.object(updater, "download") as download:
-                    def fake_download(url, target):
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        target.write_bytes(payload)
-                        return target
-                    download.side_effect = fake_download
-                    with mock.patch.object(updater, "install") as installer:
-                        installer.return_value = {"installed": "ok"}
-                        code, out, _ = self.run_cli("update", "--apply", return_value=self.newer())
+            with mock.patch.object(updater, "apply_release") as applier:
+                applier.return_value = {"installed": "ok"}
+                code, out, _ = self.run_cli("update", "--apply", return_value=self.newer())
         self.assertEqual(code, 0)
-        download.assert_called_once()
-        installer.assert_called_once()
-        self.assertEqual(installer.call_args[0][0], expected)
-        self.assertEqual(installer.call_args[0][1], digest)
+        applier.assert_called_once()
+        self.assertEqual(applier.call_args[0][0], self.newer())
+        self.assertEqual(applier.call_args[0][1], expected.parent)
 
-    def test_apply_without_published_checksums_installs_nothing(self):
+    def test_apply_refuses_when_the_release_is_not_signed(self):
+        def refuse(*arguments, **keywords):
+            raise updater.UpdateUnavailable(
+                "The release is not signed by this project. Nothing was installed.")
         with mock.patch.object(updater, "newest_remote_version", return_value=self.newer()):
-            with mock.patch.object(updater, "fetch_checksums", return_value={}):
-                with mock.patch.object(updater, "install") as installer:
-                    code, _, err = self.run_cli("update", "--apply", return_value=self.newer())
-        installer.assert_not_called()
+            with mock.patch.object(updater, "apply_release", refuse):
+                code, _, err = self.run_cli("update", "--apply", return_value=self.newer())
         self.assertEqual(code, 1)
         self.assertIn("No se instaló", err)
+        self.assertIn("not signed", err)
 
-    def test_apply_stops_when_the_download_fails(self):
+    def test_apply_does_not_start_when_the_confirmation_does_not_match(self):
         with mock.patch.object(updater, "newest_remote_version", return_value=self.newer()):
-            with mock.patch.object(updater, "fetch_checksums",
-                                   return_value={NEW_WHEEL: "0" * 64}):
-                with mock.patch.object(updater, "download",
-                                       side_effect=updater.UpdateUnavailable("no")):
-                    with mock.patch.object(updater, "install") as installer:
-                        code, _, err = self.run_cli("update", "--apply", return_value=self.newer())
-        installer.assert_not_called()
+            with mock.patch.object(updater, "apply_release") as applier:
+                code, _, err = self.run_cli("update", "--apply", return_value="0.0.1")
+        applier.assert_not_called()
         self.assertEqual(code, 1)
+        self.assertIn("No coincide", err)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,19 @@ from cshcli.errors import DomainError
 from cshcli.server import make_server
 
 
+def error_payload(text):
+    """The error the CLI printed, ignoring anything else on the stream.
+
+    Warnings can reach the same stream, and a test that breaks because a
+    ResourceWarning was printed is not measuring the coordinator.
+    """
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if line.startswith("{") and line.endswith("}"):
+            return json.loads(line)
+    raise AssertionError(f"no error payload in {text!r}")
+
+
 class CliTests(unittest.TestCase):
     def invoke(self, args, env=None):
         out, err = io.StringIO(), io.StringIO()
@@ -41,7 +54,7 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(code, 0)
                 code, _, err = self.invoke(["memory", "put", project, "decision", "--content", "conflict", "--expected-version", "0"], env)
                 self.assertEqual(code, 1)
-                self.assertIn("error", json.loads(err))
+                self.assertIn("error", error_payload(err))
                 code, out, _ = self.invoke(["deploy", "reserve", project, "staging", "--agent", "ana-1"], env)
                 self.assertEqual(code, 0)
                 lease = json.loads(out)[0]
@@ -56,7 +69,7 @@ class CliTests(unittest.TestCase):
     def test_missing_collaboration_token_is_safe(self):
         code, _, err = self.invoke(["project", "list"])
         self.assertEqual(code, 1)
-        self.assertEqual(json.loads(err)["error"]["code"], "authentication_required")
+        self.assertEqual(error_payload(err)["error"]["code"], "authentication_required")
 
     def test_provider_commands_delegate_without_coordinator(self):
         with patch("cshcli.cli.providers.chat", return_value="answer") as chat:
@@ -121,7 +134,7 @@ class CliTests(unittest.TestCase):
                         ["project", "list"],
                         {"CSHCLI_TOKEN": "fixture", "CSHCLI_URL": "http://127.0.0.1:8765"})
                 self.assertEqual(code, 1)
-                self.assertEqual(json.loads(errors)["error"]["code"], expected)
+                self.assertEqual(error_payload(errors)["error"]["code"], expected)
 
 class MilestoneCommandTests(unittest.TestCase):
     def setUp(self):
@@ -186,7 +199,7 @@ class MilestoneCommandTests(unittest.TestCase):
         self.invoke(["run", "reserve", self.project, "a", "--max-agents", "1"])
         code, _, errors = self.invoke(["run", "reserve", self.project, "b", "--max-agents", "1"])
         self.assertEqual(code, 1)
-        self.assertEqual(json.loads(errors)["error"]["code"], "agent_limit_reached")
+        self.assertEqual(error_payload(errors)["error"]["code"], "agent_limit_reached")
 
     def test_patch_accept_and_list(self):
         lease = json.loads(self.invoke(
@@ -206,7 +219,7 @@ class MilestoneCommandTests(unittest.TestCase):
             "patch", "accept", self.project, "run-1",
             "--base-sha", "a" * 40, "--commit-sha", "b" * 40, "--lease", "no-fence"])
         self.assertEqual(code, 1)
-        self.assertEqual(json.loads(errors)["error"]["code"], "invalid_lease_fence")
+        self.assertEqual(error_payload(errors)["error"]["code"], "invalid_lease_fence")
 
     def test_patch_accept_rejects_a_stale_fence_over_the_cli(self):
         lease = json.loads(self.invoke(
@@ -218,7 +231,7 @@ class MilestoneCommandTests(unittest.TestCase):
             "--base-sha", "a" * 40, "--commit-sha", "b" * 40,
             "--lease", "file:src/api.py=" + str(lease[0]["fence"])])
         self.assertEqual(code, 1)
-        self.assertEqual(json.loads(errors)["error"]["code"], "fence_mismatch")
+        self.assertEqual(error_payload(errors)["error"]["code"], "fence_mismatch")
 
 
 if __name__ == "__main__":

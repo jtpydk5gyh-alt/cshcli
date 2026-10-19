@@ -31,7 +31,7 @@ actual.
   cero docstrings y un único comentario, el shebang de
   `scripts/push_rewritten_main.py`.
 - La última suite completa, **con PostgreSQL 16.2 en pie**, terminó con
-  **712 pruebas: 706 verdes y 6 omitidas con motivo, en 432.855 s**. Las seis
+  **731 pruebas: 725 verdes y 6 omitidas con motivo, en 464.277 s**. Las seis
   omitidas son cinco casos de symlink que esta máquina no concede y uno de
   permisos POSIX que no aplica en Windows. Sin base de datos se omiten veinte
   más, y por eso esta cuenta importa: **el total no baja por tener la base
@@ -54,7 +54,7 @@ fichero nuevo, y `tests/test_encoding.py` ya lo mide en cada ejecución.
 
 **La clave de firma ya existe.** El propietario autorizó crearla el 17 de
 octubre de 2026, y esa era la única cosa que faltaba. `release.py` firma
-`SHA256SUMS` y la clave pública está commiteada en `cshcli-release.pub`, que es
+`SHA256SUMS` y la clave pública está dentro del paquete, en `src/cshcli/release.pub`, que es
 lo único que sale de la máquina del propietario.
 
 Comprobado en las dos direcciones: la firma verifica con la clave publicada,
@@ -432,7 +432,7 @@ hechos; **el paso 4, `serve --remote`, necesita una máquina**.
 | Módulo Python | `cshcli`, 24 módulos más `__init__` y `__main__`, comando `cshcli`, script `scripts/cshcli.py` |
 | Estado local | `.cshcli/`, ignorado por git |
 | PRs mergeadas | 80, sin `--admin`: el control obligatorio se respeta |
-| Pruebas | 712 en total: **706 verdes** y 6 omitidas con motivo, con PostgreSQL 16.2 en pie |
+| Pruebas | 731 en total: **725 verdes** y 6 omitidas con motivo, con PostgreSQL 16.2 en pie |
 | CI | verde en Windows y Linux × Python 3.11, 3.12, 3.13 |
 
 ## Qué es y qué no es

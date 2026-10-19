@@ -25,7 +25,7 @@ half a thing.
 
 **The owner authorised the key on 17 October 2026 and it was created.** The
 private key is password-protected and lives outside the repository; the public
-key is committed at `cshcli-release.pub`, which is the only part that ever
+key is committed at `src/cshcli/release.pub`, which is the only part that ever
 leaves the machine.
 
 `release.py` signs `SHA256SUMS` by itself, checks that the signature was
@@ -42,9 +42,27 @@ CSHCLI_SIGNING_KEY=ruta\a\la-clave.key  python scripts/release.py
 ```
 
 **What is left of it.** Publishing, which stays manual while there is one owner.
-Then, and only then, `cshcli update` exercised against something real instead of
-a network double, which is the one product path in the online plan that has
-never run against a real artefact.
+Then, and only then, `cshcli update` exercised against something published,
+which is the one product path in the online plan that has never run against a
+real artefact.
+
+**And the update path itself was broken, which nobody could see because the
+tests used doubles.** `cshcli update --apply` fetched the archive of `main` and
+compared it against `sorted(digests)[0]` — whatever sorted first in the checksum
+file, not the file it had downloaded — and asked for `SHA256SUMS` at an archive
+URL that does not serve a single file. Worse, the checksum and the artefact came
+from the same place, so the check proved the download was not corrupted and
+nothing about **who** published it. The signature existed and nothing consumed
+it.
+
+It now takes the release's own assets, verifies the signature against the key
+inside the installed package, picks the wheel for this interpreter out of the
+signed checksum file, and installs only that. Proved end to end against a real
+HTTP server serving real artefacts: a signed release installs, and a missing
+signature, an altered checksum file, a wheel that does not match, a signature
+from another key and a machine without `minisign` all install nothing. What
+remains unexercised is only the step where the release sits on a public server
+instead of a local one.
 
 ## 2. Blocked on a second machine: the last four proofs
 
@@ -109,8 +127,9 @@ thing".
   rollback run against a separate process and a real health socket, but no
   provider is configured and no environment exists.
 - **No CA, no public certificate, no second host.** See section 2.
-- **`cshcli update` never ran against a published release.** Blocked behind
-  section 1.
+- **`cshcli update` has never read a release from a public server.** It is
+  proved end to end against a real HTTP server serving real artefacts, but the
+  server was this machine. Blocked behind section 1.
 
 ## Order
 

@@ -19,11 +19,11 @@ says so and the reason is in [OPERATIONS.md](OPERATIONS.md),
 | Conversational entry point | `cshcli` on its own opens a chat loop when the session is ready, and runs the first-run menu when it is not. Each turn carries the previous ones, capped at 20; the first question also carries the project's shared memory, capped at 8000 characters, and an index of the folder the CLI was opened in, capped at 4000 characters and reporting how many files were left out. `/buscar <texto>` finds where something lives and `/ver <ruta>` reads one file into the conversation, both through the same `Workspace` resolver the mediated runner uses. `/limpiar` clears, `/salir`, `/quit` and Ctrl-D leave. A provider error prints and the loop continues. `cshcli chat "text"` stays a single query. Request bodies per provider are tested; **no provider has been contacted** |
 | What the chat can read | The index lists what fits the budget, README, `docs/`, `src/` and `tests/` first, and skips `.git`, `__pycache__`, `node_modules`, `dist` and the usual binary suffixes. `/ver` refuses absolute paths, `..`, Git metadata, symbolic links, Windows junctions and hard links, and refuses a file that is not text. **The chat reads; it executes nothing** |
 | Finding things | `/buscar <texto>` returns `ruta:línea: texto`, ignores case, visits exactly the files the index lists, caps the answer and reports the hits it left out. A query with no hits prints that and **does not call the provider**, because the answer is already known locally. Symbolic links and junctions are never opened and binaries are skipped |
-| Update check | `cshcli update` compares and reports without changing anything. `--apply` needs the version typed and verifies the checksum first. Tested with a fake transport; **no real download has been performed** |
+| Update check | `cshcli update` compares and reports without changing anything. `--apply` needs the version typed, then fetches the release's `SHA256SUMS` and `SHA256SUMS.minisig`, **verifies the signature against the key inside the installed package**, picks this interpreter's wheel out of the signed file, checks its checksum and installs it. Proved end to end against a real HTTP server serving real artefacts; **never against a published release** |
 | First run without instructions | `cshcli start` is a two-option menu that performs the setup: a private session, or joining with an invitation code or creating a shared project. No server is started first: the coordinator is implicit. `cshcli key set` stores a provider key outside the environment. Tested end to end through the real CLI entry point |
 | Coordinator lifetime | A command with no reachable coordinator runs one inside its own process on an ephemeral port and closes it on exit. Identity, current project and token live in `.cshcli/session.json`, so later commands need no `--url` and no token. Two embedded coordinators over one database are tested. `cshcli serve` still provides a long-lived one |
 | Key storage | `Keyring` in `.cshcli/keys.json`, readable only by the user on POSIX. A key set in the environment wins over one on disk, because whoever exported it knows what they are doing. Nothing ever prints a key |
-| Published artefact | Wheel builds, `SHA256SUMS` written, and the **installed** copy imports and answers `--help` on Python 3.12.10, Windows. **Signing is ready, not done**: `release.py` signs by itself once `CSHCLI_SIGNING_KEY` points at the owner's key, and `minisign` 0.12 is installed and verified. **Not published, not checked on other platforms** |
+| Published artefact | Wheel builds, `SHA256SUMS` written, the **installed** copy imports and answers `--help` on Python 3.12.10, Windows, and `SHA256SUMS` is **signed** with the key at `src/cshcli/release.pub`. **Not published, not checked on other platforms** |
 | Local HTTP and SQLite WAL | Two-identity flow tested with a real server |
 | owner / member / viewer projects | Read and write paths per permission verified |
 | Invitations | Expiration, single use, and races tested |
@@ -42,7 +42,7 @@ says so and the reason is in [OPERATIONS.md](OPERATIONS.md),
 | Usage and budgets (11) | `Usage.record` with `Decimal`, currency, price date and unit; unknown costs stay `null` and are excluded from totals rather than zeroed. `authorize_run` never invents an estimate and refuses when usage is incomplete. Audit export states that retention is unconfigured |
 | Chaos drills (11) | **Local drills done.** Stopping the coordinator leaves a running task running, not silently finished; a dead agent's lease expires and a second agent takes the resource; the stale holder cannot renew or release the new lease; state written by one process is read by another; an aborted batch leaves nothing behind; a re-run of an interrupted deploy does not repeat the effect |
 | Restore (11) | **Proven on a real PostgreSQL.** `pg_dump` and `pg_restore` into an empty database, row counts compared per table, a restore over a populated database refused, and the fence sequence never observed going backwards. **Not verified:** a restore on a second machine while the first serves traffic |
-| Release (11) | Wheel builds, `SHA256SUMS` written, installed copy verified, and `SHA256SUMS` **signed** with the key at `cshcli-release.pub`. **Not published** |
+| Release (11) | Wheel builds, `SHA256SUMS` written, installed copy verified, and `SHA256SUMS` **signed** with the key at `src/cshcli/release.pub`. **Not published** |
 | Deployment publish and rollback | Coordination complete, and the four acceptance checks run against a separate process and a real health socket. **No provider is configured and nothing has been published anywhere** |
 | Native direct OAuth | `ProviderAuth` implements PKCE, one-use state, exact loopback redirect and a local store, behind a review registry that is **empty on purpose**. No provider is eligible |
 | Personal data guard | Pre-commit hook and a **required** CI check; refuses personal emails, private relay addresses, user paths and a non-noreply identity. Reads the staged index and fails closed |
@@ -59,7 +59,7 @@ Observed environment: Windows with CPython 3.12.14. The interpreter path is
 machine specific and is deliberately not recorded here.
 
 With `PYTHONPATH=src`, the command `python -m unittest discover -s tests`
-returned **712 tests in 432.855 seconds**: 706 passing and 6 skipped. Every skip
+returned **731 tests in 464.277 seconds**: 725 passing and 6 skipped. Every skip
 says why: five symbolic link cases on a host that does not grant the
 privilege, and one POSIX file permission case that does not apply on Windows.
 The Windows junction cases run.
@@ -68,7 +68,7 @@ The Windows junction cases run.
 `unittest` prints `Ran <total>`, and the skip count is part of that total. A run
 without a database reports the *same* total with 26 skipped, not fewer tests, so
 "the suite passes N tests" was wrong twice over: it counted skipped tests as
-passing and it moved with the environment. Read it as **706 green of 712**, and
+passing and it moved with the environment. Read it as **725 green of 731**, and
 run it with `CSHCLI_REMOTE_DSN` pointing at the local cluster, because twenty
 tests that talk to PostgreSQL otherwise skip and prove nothing.
 
@@ -200,11 +200,11 @@ Two decisions about what the chat carries, each with a reason:
 | --- | --- |
 | First run that needs no instructions, with a local key store | Done. `cshcli start` is a two-option menu that performs the setup, and the coordinator is implicit, so no server is started |
 | Document the install command with its three caveats | Done |
-| `cshcli update` that reports first and installs on consent with a checksum | Done locally, with network doubles. Never exercised against a published release |
+| `cshcli update` that reports first and installs on consent with a checksum | **Done, and the install path was broken.** It fetched the archive of `main` and compared it against whatever sorted first in the checksum file. It now installs the signed release wheel, and the whole path is proved against a real HTTP server. Never exercised against a published release |
 | `cshcli serve --remote` over HTTPS with PostgreSQL | **Done here.** It binds, serves `/healthz` over TLS against a live PostgreSQL and refuses plain HTTP. The certificate is self-signed, so this proves the path, not public trust |
 | Standing the remote coordinator up and proving real concurrency | **Done on one machine.** Eleven independent processes race and one wins. Eleven *machines* still need a second one |
 | Chaos drills and a proven restore | **Done.** `pg_dump` and `pg_restore` into an empty database, counts compared, restore over a populated database refused, fence never rewound. A restore on a second machine is still unproven |
-| Signing and publishing the release | **Signing is done.** The owner authorised the key on 17 October 2026 and `release.py` signs by itself; the public key is at `cshcli-release.pub`. **Publishing is still manual** |
+| Signing and publishing the release | **Signing is done.** The owner authorised the key on 17 October 2026 and `release.py` signs by itself; the public key is at `src/cshcli/release.pub`. **Publishing is still manual** |
 | Requiring a queue entry to come from an accepted patch | Done. The queue refuses a commit with no accepted-patch record and one accepted with a different base, and rechecks acceptance immediately before the merge |
 | The chat starting from the folder it was opened in | Done. The first question carries a capped index of the files, `/buscar <texto>` finds where something lives, and `/ver <ruta>` reads one file into the conversation, all through `Workspace`. Tested through the real CLI entry point |
 

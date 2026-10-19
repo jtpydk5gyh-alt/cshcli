@@ -10,15 +10,15 @@ once it leaves alpha.
 ### Added
 - **The release is signed.** The owner authorised the key on 17 October 2026.
   `release.py` signs `SHA256SUMS` when `CSHCLI_SIGNING_KEY` points at the private
-  key, and the public key is committed at `cshcli-release.pub` so anyone can
-  verify a download. Checked in both directions: the signature verifies with the
-  published key, a different real key is rejected with a key-id mismatch, and
-  changing one byte of `SHA256SUMS` invalidates it. `release.py
-  --require-signature` refuses with exit code 1 when no key is available, so
-  publishing unsigned is a refusal rather than a warning. The private key is
-  password-protected and never enters the repository; a test fails if anything
-  ending in `.key` or `.password.txt` is ever tracked.
-
+  key, and the public key is committed at `src/cshcli/release.pub` so anyone can
+  verify a download and the installed copy can verify the next update. Checked
+  in both directions: the signature verifies with the published key, a different
+  real key is rejected with a key-id mismatch, and changing one byte of
+  `SHA256SUMS` invalidates it. `release.py --require-signature` refuses with exit
+  code 1 when no key is available, so publishing unsigned is a refusal rather
+  than a warning. The private key is password-protected and never enters the
+  repository; a test fails if anything ending in `.key` or `.password.txt` is
+  ever tracked.
 - **`migrate.py --status`** lists every up migration and says whether it is
   applied or pending, so the state of a database is readable without reading the
   code.
@@ -26,21 +26,37 @@ once it leaves alpha.
   been applied and a migration already recorded is skipped.
 
 ### Fixed
+- **`cshcli update --apply` installed the wrong thing, or nothing at all.** It
+  fetched the archive of `main` and compared it against `sorted(digests)[0]` —
+  whatever sorted first in the published checksum file, not the file it had
+  downloaded — and it asked for `SHA256SUMS` at an archive URL that does not
+  serve a single file. The install was refused by its own checksum, and no test
+  saw it because the tests used doubles instead of the real path.
+- **The updater never checked the signature, so the checksum proved nothing
+  about who published the release.** The checksum and the artefact came from the
+  same place, which proves the download was not corrupted in transit and
+  nothing else. The signature existed and nothing consumed it. The update path
+  now takes the release's own assets, verifies `SHA256SUMS.minisig` against the
+  key **inside the installed package** — which did not come from the same
+  download — picks the wheel for this interpreter out of the signed checksum
+  file, and installs only that. A missing signature, an altered checksum file, a
+  wheel that does not match, a signature from another key and a machine without
+  `minisign` all install nothing, and each of those is proved against a real
+  HTTP server serving real artefacts.
+- **A leaked socket could break an unrelated test.** The new end-to-end test
+  shut its server down without closing it, and the `ResourceWarning` that
+  followed landed in the middle of another test's captured stderr, where a
+  `json.loads` of the error payload failed on the leading warning text. The
+  server is closed properly now, and the CLI tests read the error payload
+  instead of assuming the whole stream is JSON: a test that breaks because a
+  warning was printed is not measuring the coordinator.
 - **The suite count was being read wrong, and the wrong number shipped.** Every
   release note said the suite "passes N tests with 26 skipped", but `unittest`
   prints `Ran <total>` and the skips are part of that total. `Ran 707 ... OK
   (skipped=26)` meant **681 passing**, not 707. It also moved with the
   environment: the total does not change when the database is down, twenty
-  tests simply stop running. Read correctly and run against a live PostgreSQL,
-  it is **710 tests, 704 passing, 6 skipped**, with the twenty PostgreSQL cases
-  actually exercised. Four documents carried the wrong figure.
+  tests simply stop running. Four documents carried the wrong figure.
 - **The guard's own tests published the owner's real user name.** The path
-  fixtures in `tests/test_guard.py` used `C:/Users/<real name>`, and that file is
-  exempt from the guard precisely because it has to contain what the guard
-  rejects. The fixtures now use a generic name. The pattern under test is the
-  *shape* `/Users/<something>/`, not the name, and that was checked in both
-  directions: neutralising the pattern makes three tests fail, and restoring it
-  makes them pass.
   fixtures in `tests/test_guard.py` used `C:/Users/<real name>`, and that file is
   exempt from the guard precisely because it has to contain what the guard
   rejects. The fixtures now use a generic name. The pattern under test is the
@@ -75,13 +91,6 @@ once it leaves alpha.
   the owner's to create, the four proofs that need a second machine, the
   decisions that are closed by choice rather than by effort, and what has never
   been exercised against a real provider, a real release or a real deployment.
-
-### Known limitation
-- **The sandbox still does not exist.** No CPU, memory, process or network
-  limits, and arbitrary execution stays unimplemented by design. The mediated
-  runner validates the lease before every write and exposes no command
-  execution; building the runner itself needs a Linux container or VM whose
-  controls have been verified.
 
 ## [0.9.0] - 2026-10-16
 
