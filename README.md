@@ -339,7 +339,7 @@ python scripts/cshcli.py --help
 python scripts/guard_secrets.py --all
 ```
 
-The full suite runs 735 tests with a live PostgreSQL, 729 passing and 6
+The full suite runs 737 tests with a live PostgreSQL, 731 passing and 6
 explicitly skipped: symbolic-link
 cases this host does not grant, one POSIX file-permission case that does not
 apply on Windows, and twenty that need `CSHCLI_REMOTE_DSN`. Those twenty were

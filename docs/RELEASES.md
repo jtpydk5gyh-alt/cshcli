@@ -122,6 +122,17 @@ artefacts in `tests/test_update_end_to_end.py`: a signed release installs, and
 a missing signature, an altered checksum file, a wheel that does not match, a
 signature from another key and a machine with no `minisign` all install nothing.
 
+## The release refuses a wheel that cannot verify anything
+
+A wheel without `release.pub` installs perfectly, answers `--help`, and then
+rejects every release without saying why. `release.py` therefore checks the
+**installed** copy, not just the built one, and refuses the release when the
+key is not there. The check is proved in both directions: a copy with the key
+is accepted, and one without it is refused.
+
+That is also why the key is declared as package data. A key that only lives in
+the repository would be invisible to anyone who installed the package.
+
 ## `release.py` now signs by itself
 
 That procedure became a flag. Put the key where the script can find it:

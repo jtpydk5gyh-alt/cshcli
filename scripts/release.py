@@ -105,8 +105,17 @@ def verify_install(wheel: Path, version: str, into: Path) -> dict:
     if help_run.returncode != 0:
         raise ReleaseRefused(
             f"the installed CLI does not answer --help: {help_run.stderr.strip()[-300:]}")
+    key_run = subprocess.run(
+        [sys.executable, "-c",
+         "from cshcli import updater; print(updater.PUBLIC_KEY.is_file())"],
+        cwd=into, capture_output=True, text=True, env=environment)
+    if key_run.returncode != 0 or key_run.stdout.strip() != "True":
+        raise ReleaseRefused(
+            "the installed copy has no public key, so it could not verify any "
+            f"release: {key_run.stderr.strip()[-300:]}")
     return {"version": reported, "python": sys.version.split()[0],
-            "help_lines": len(help_run.stdout.splitlines())}
+            "help_lines": len(help_run.stdout.splitlines()),
+            "public_key": True}
 
 
 def signing_key_from_environment() -> Path | None:
