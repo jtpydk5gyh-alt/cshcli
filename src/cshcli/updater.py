@@ -61,14 +61,13 @@ def newest_remote_version(opener=urllib.request.urlopen) -> str | None:
 
 def compare(installed: str, published: str | None) -> dict:
     report = {"installed": installed, "published": published,
-              "action": "none", "from_main": published is None,
-              "assets": RELEASE_ASSETS,
+              "action": "none", "source": None, "assets": RELEASE_ASSETS,
               "detail": ""}
     if published is None:
         report["action"] = "unknown"
         report["detail"] = (
-            "No published release. Installing would fetch the head of main, "
-            "which is neither versioned nor reviewed.")
+            "No published release, so nothing is installed. A release is only "
+            "installed when it is signed; an unreleased branch is never installed.")
         return report
     try:
         left, right = parse_version(installed), parse_version(published)
@@ -76,6 +75,7 @@ def compare(installed: str, published: str | None) -> dict:
         report["action"] = "unknown"
         report["detail"] = f"{reason}."
         return report
+    report["source"] = f"{RELEASE_ASSETS}/{published}"
     if left == right:
         report["action"] = "current"
         report["detail"] = "The installed version is the published one."
@@ -85,7 +85,8 @@ def compare(installed: str, published: str | None) -> dict:
     else:
         report["action"] = "ahead"
         report["detail"] = (f"{installed} is newer than the published {published}; "
-                            "that is normal when installed from main.")
+                            "that happens when the installed copy came from "
+                            "somewhere other than a release.")
     return report
 
 
